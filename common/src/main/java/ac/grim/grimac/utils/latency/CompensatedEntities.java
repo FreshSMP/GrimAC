@@ -29,6 +29,7 @@ import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerUp
 import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import it.unimi.dsi.fastutil.ints.IntArraySet;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +47,7 @@ public class CompensatedEntities {
     public final IntArraySet entitiesRemovedThisTick = new IntArraySet();
     public final Int2ObjectOpenHashMap<TrackerData> serverPositionsMap = new Int2ObjectOpenHashMap<>(40, 0.7f);
     public final Object2ObjectOpenHashMap<UUID, UserProfile> profiles = new Object2ObjectOpenHashMap<>();
+    private final Object2ObjectOpenHashMap<String, UUID> profileIdsByName = new Object2ObjectOpenHashMap<>();
     public Integer serverPlayerVehicle = null;
     public boolean hasSprintingAttributeEnabled = false;
     public TrackerData selfTrackedEntity;
@@ -234,6 +236,34 @@ public class CompensatedEntities {
             return self;
         }
         return entityMap.get(entityID);
+    }
+
+    public void addProfile(UserProfile profile) {
+        final UUID uuid = profile.getUUID();
+        final UserProfile previous = profiles.put(uuid, profile);
+        if (previous != null && previous.getName() != null) {
+            profileIdsByName.remove(previous.getName(), uuid);
+        }
+        if (profile.getName() != null) {
+            profileIdsByName.put(profile.getName(), uuid);
+        }
+    }
+
+    public void removeProfile(UUID uuid) {
+        final UserProfile removed = profiles.remove(uuid);
+        if (removed == null || removed.getName() == null) return;
+        if (!profileIdsByName.remove(removed.getName(), uuid)) return;
+        // another profile may carry the same name (NPC plugins do this); keep the index pointing at it
+        for (UserProfile profile : profiles.values()) {
+            if (removed.getName().equals(profile.getName())) {
+                profileIdsByName.put(profile.getName(), profile.getUUID());
+                return;
+            }
+        }
+    }
+
+    public @Nullable UUID getProfileId(String name) {
+        return profileIdsByName.get(name);
     }
 
     public TrackerData getTrackedEntity(int id) {

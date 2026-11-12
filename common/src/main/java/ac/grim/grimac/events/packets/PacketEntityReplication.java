@@ -27,7 +27,6 @@ import com.github.retrooper.packetevents.protocol.entity.type.EntityTypes;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.player.ClientVersion;
 import com.github.retrooper.packetevents.protocol.player.InteractionHand;
-import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.protocol.potion.PotionType;
 import com.github.retrooper.packetevents.protocol.vector.positionpath.LinearPositionPath;
 import com.github.retrooper.packetevents.protocol.vector.positionpath.PositionPath;
@@ -215,26 +214,22 @@ public class PacketEntityReplication extends GrimProcessor implements PacketRece
             if (info.getActions().contains(WrapperPlayServerPlayerInfoUpdate.Action.ADD_PLAYER)) {
                 player.latencyUtils.addRealTimeTask(player.lastTransactionSent.get(), () -> {
                     for (WrapperPlayServerPlayerInfoUpdate.PlayerInfo entry : info.getEntries()) {
-                        final UserProfile gameProfile = entry.getGameProfile();
-                        final UUID uuid = gameProfile.getUUID();
-                        player.compensatedEntities.profiles.put(uuid, gameProfile);
+                        player.compensatedEntities.addProfile(entry.getGameProfile());
                     }
                 });
             }
         } else if (event.getPacketType() == PacketType.Play.Server.PLAYER_INFO_REMOVE) {
             WrapperPlayServerPlayerInfoRemove remove = new WrapperPlayServerPlayerInfoRemove(event);
-            player.latencyUtils.addRealTimeTask(player.lastTransactionSent.get(), () -> remove.getProfileIds().forEach(player.compensatedEntities.profiles::remove));
+            player.latencyUtils.addRealTimeTask(player.lastTransactionSent.get(), () -> remove.getProfileIds().forEach(player.compensatedEntities::removeProfile));
         } else if (event.getPacketType() == PacketType.Play.Server.PLAYER_INFO) {
             WrapperPlayServerPlayerInfo info = new WrapperPlayServerPlayerInfo(event);
             player.latencyUtils.addRealTimeTask(player.lastTransactionSent.get(), () -> {
                 if (info.getAction() == WrapperPlayServerPlayerInfo.Action.ADD_PLAYER) {
                     for (WrapperPlayServerPlayerInfo.PlayerData entry : info.getPlayerDataList()) {
-                        final UserProfile gameProfile = entry.getUserProfile();
-                        final UUID uuid = gameProfile.getUUID();
-                        player.compensatedEntities.profiles.put(uuid, gameProfile);
+                        player.compensatedEntities.addProfile(entry.getUserProfile());
                     }
                 } else if (info.getAction() == WrapperPlayServerPlayerInfo.Action.REMOVE_PLAYER) {
-                    info.getPlayerDataList().forEach(profile -> player.compensatedEntities.profiles.remove(profile.getUserProfile().getUUID()));
+                    info.getPlayerDataList().forEach(profile -> player.compensatedEntities.removeProfile(profile.getUserProfile().getUUID()));
                 }
             });
         } else if (event.getPacketType() == PacketType.Play.Server.ENTITY_EFFECT) {

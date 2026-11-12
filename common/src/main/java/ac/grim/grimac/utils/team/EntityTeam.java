@@ -1,13 +1,13 @@
 package ac.grim.grimac.utils.team;
 
 import ac.grim.grimac.player.GrimPlayer;
-import com.github.retrooper.packetevents.protocol.player.UserProfile;
 import com.github.retrooper.packetevents.wrapper.play.server.WrapperPlayServerTeams;
 import lombok.Getter;
 
 import java.util.HashSet;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 public final class EntityTeam {
 
@@ -28,24 +28,21 @@ public final class EntityTeam {
         final TeamHandler teamHandler = player.checkManager.get(TeamHandler.class);
         final WrapperPlayServerTeams.TeamMode mode = teams.getTeamMode();
         if (mode == WrapperPlayServerTeams.TeamMode.ADD_ENTITIES || mode == WrapperPlayServerTeams.TeamMode.CREATE) {
-            label:
             for (String teamPlayer : teams.getPlayers()) {
                 if (teamPlayer.equals(player.user.getName())) {
                     teamHandler.setPlayerTeam(this);
                     continue;
                 }
 
-                for (UserProfile profile : player.compensatedEntities.profiles.values()) {
-                    if (profile.getName() != null && profile.getName().equals(teamPlayer)) {
-                        teamHandler.addEntityToTeam(profile.getUUID().toString(), this);
-                        continue label;
-                    }
+                final UUID uuid = player.compensatedEntities.getProfileId(teamPlayer);
+                if (uuid != null) {
+                    teamHandler.addEntityToTeam(uuid.toString(), this);
+                    continue;
                 }
 
                 teamHandler.addEntityToTeam(teamPlayer, this);
             }
         } else if (mode == WrapperPlayServerTeams.TeamMode.REMOVE_ENTITIES) {
-            label:
             for (String teamPlayer : teams.getPlayers()) {
                 if (teamPlayer.equals(player.user.getName())) {
                     // Player was removed from their team.
@@ -53,13 +50,12 @@ public final class EntityTeam {
                     continue;
                 }
 
-                for (UserProfile profile : player.compensatedEntities.profiles.values()) {
-                    if (profile.getName() != null && profile.getName().equals(teamPlayer)) {
-                        String uuid = profile.getUUID().toString();
-                        entries.remove(uuid);
-                        teamHandler.removeEntityFromTeam(uuid);
-                        continue label;
-                    }
+                final UUID profileId = player.compensatedEntities.getProfileId(teamPlayer);
+                if (profileId != null) {
+                    String uuid = profileId.toString();
+                    entries.remove(uuid);
+                    teamHandler.removeEntityFromTeam(uuid);
+                    continue;
                 }
 
                 // Entity was removed from their team.
