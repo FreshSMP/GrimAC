@@ -7,6 +7,7 @@ import ac.grim.grimac.utils.math.GrimMath;
 import com.github.retrooper.packetevents.event.PacketReceiveEvent;
 import com.github.retrooper.packetevents.protocol.attribute.Attributes;
 import com.github.retrooper.packetevents.protocol.item.ItemStack;
+import com.github.retrooper.packetevents.protocol.item.type.ItemType;
 import com.github.retrooper.packetevents.protocol.packettype.PacketType;
 import com.github.retrooper.packetevents.protocol.player.DiggingAction;
 import com.github.retrooper.packetevents.protocol.world.BlockFace;
@@ -14,7 +15,11 @@ import com.github.retrooper.packetevents.wrapper.play.client.WrapperPlayClientPl
 
 public class AttackCooldownHandler extends GrimProcessor implements PacketReceiveListener {
     private int ticksSinceLastSwing;
-    private ItemStack stack = ItemStack.EMPTY;
+    // the held item is compared by these fields only, so remember them instead of a copy of the stack
+    private boolean stackEmpty;
+    private ItemType stackType;
+    private boolean stackDamageable;
+    private int stackLegacyData;
     // Since we don't know when the client ticks, we call updateHeldItem() when the held item changes,
     // but that means ticksSinceLastSwing is incremented after it gets reset. This is wrong, so we
     // compensate for that by not incrementing ticksSinceLastSwing if updateHeldItem() was called
@@ -23,6 +28,7 @@ public class AttackCooldownHandler extends GrimProcessor implements PacketReceiv
 
     public AttackCooldownHandler(GrimPlayer player) {
         super(player);
+        remember(ItemStack.EMPTY);
     }
 
     @Override
@@ -56,14 +62,21 @@ public class AttackCooldownHandler extends GrimProcessor implements PacketReceiv
     // called on client tick and whenever the slot gets updated
     public void updateHeldItem(boolean tick) {
         if (!tick && player.supportsEndTick()) return;
-        ItemStack held = player.inventory.getHeldItem().copy();
+        ItemStack held = player.inventory.getHeldItem();
 
-        if (!(stack.isEmpty() && held.isEmpty() || stack.getType() == held.getType() && (stack.isDamageableItem() || stack.getLegacyData() == held.getLegacyData()))) {
+        if (!(stackEmpty && held.isEmpty() || stackType == held.getType() && (stackDamageable || stackLegacyData == held.getLegacyData()))) {
             reset();
             stackChanged = true;
         }
 
-        stack = held;
+        remember(held);
+    }
+
+    private void remember(ItemStack held) {
+        stackEmpty = held.isEmpty();
+        stackType = held.getType();
+        stackDamageable = held.isDamageableItem();
+        stackLegacyData = held.getLegacyData();
     }
 
     public float getMinimumProgress() {
