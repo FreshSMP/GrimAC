@@ -126,20 +126,26 @@ public class PointThreeEstimator {
 
     // Handle game events that occur between skipped ticks - thanks a lot mojang for removing the idle packet!
     public void handleChangeBlock(int x, int y, int z, WrappedBlockState state) {
+        final double movementThreshold = player.getMovementThreshold();
+        final float collisionBoxThreshold = (float) (movementThreshold * 2.f);
+        SimpleCollisionBox pointThreeBox = GetBoundingBox.getBoundingBoxFromPosAndSize(player, player.x, player.y - movementThreshold, player.z, 0.6f + collisionBoxThreshold, 1.8f + collisionBoxThreshold);
+
+        // Everything below needs the block to touch the player's box (the head hitter box sits inside it, give or
+        // take the threshold, and no block shape reaches further than half a block past its cell), so a block more
+        // than a block away cannot change anything; skip the collision lookup, which is the expensive part
+        if (!pointThreeBox.isIntersected(new SimpleCollisionBox(x - 1, y - 1, z - 1, x + 2, y + 2, z + 2))) return;
+
         final StateType stateType = state.getType();
         CollisionBox data = CollisionData.getData(stateType).getMovementCollisionBox(player, player.getClientVersion(), state, x, y, z);
         SimpleCollisionBox normalBox = GetBoundingBox.getBoundingBoxFromPosAndSize(player, player.x, player.y, player.z, 0.6f, 1.8f);
 
         // Calculate head hitters.  Take a shortcut by checking if the player doesn't intersect with this block, but does
         // when the player vertically moves upwards by 0.03!  This is equivalent to the move method, but MUCH faster.
-        final double movementThreshold = player.getMovementThreshold();
         SimpleCollisionBox slightlyExpanded = normalBox.copy().expand(movementThreshold, 0, movementThreshold);
         if (!slightlyExpanded.isIntersected(data) && slightlyExpanded.offset(0, movementThreshold, 0).isIntersected(data)) {
             headHitter = true;
         }
 
-        final float collisionBoxThreshold = (float) (movementThreshold * 2.f);
-        SimpleCollisionBox pointThreeBox = GetBoundingBox.getBoundingBoxFromPosAndSize(player, player.x, player.y - movementThreshold, player.z, 0.6f + collisionBoxThreshold, 1.8f + collisionBoxThreshold);
         if ((Materials.isWater(player.getClientVersion(), state) || stateType == StateTypes.LAVA) &&
                 pointThreeBox.isIntersected(new SimpleCollisionBox(x, y, z))) {
 
