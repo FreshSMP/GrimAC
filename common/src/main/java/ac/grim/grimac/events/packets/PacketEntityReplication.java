@@ -504,6 +504,9 @@ public class PacketEntityReplication extends GrimProcessor implements PacketRece
     private void handleMoveEntity(PacketSendEvent event, int entityId, double deltaX, double deltaY, double deltaZ, Float yaw, Float pitch, boolean isRelative, boolean hasPos, @Nullable VecDelta delta, @Nullable PositionPath path) {
         TrackerData data = player.compensatedEntities.getTrackedEntity(entityId);
         if (data == null) return;
+        // Dropped items never get a PacketEntity (see CompensatedEntities#addEntity), so the movement
+        // transaction below would be a no-op for them; skip it rather than queue two tasks per move packet
+        if (data.getEntityType() == EntityTypes.ITEM) return;
 
         final boolean didNotSendPreWave = hasSentPreWavePacket.compareAndSet(false, true);
         if (didNotSendPreWave) player.sendTransaction();
