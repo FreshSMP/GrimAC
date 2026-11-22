@@ -62,6 +62,7 @@ public class UncertaintyHandler {
     public boolean isOrWasNearGlitchyBlock = false;
     // Give horizontal lenience if the previous movement was 0.03 because their velocity is unknown
     public boolean lastMovementWasZeroPointZeroThree = false;
+    public boolean couldHaveHiddenStuckReset = false;
     // Give horizontal lenience if the last movement reset velocity because 0.03 becomes unknown then
     public boolean lastMovementWasUnknown003VectorReset = false;
     // Handles 0.03 vertical false where actual velocity is greater than predicted because of previous lenience
@@ -76,6 +77,7 @@ public class UncertaintyHandler {
     public SimpleCollisionBox fishingRodPullBox = null;
     public boolean shouldSimulateStuckSpeed = false;
     public int stuckSpeedMultiplierMask = StuckSpeed.NONE.getIndex();
+    public int minimumStuckSpeedMultiplierMask = StuckSpeed.NONE.getIndex();
 
     public final LastInstance lastFlyingTicks;
     public final LastInstance lastFlyingStatusChange;
@@ -212,6 +214,14 @@ public class UncertaintyHandler {
         fireworksBox = new SimpleCollisionBox(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
+    public boolean isCertainlyStuck(VectorData data) {
+        return player.isForceStuckSpeed() && !player.inVehicle() && minimumStuckSpeedMultiplierMask != StuckSpeed.NONE.getIndex() && data.stuckSpeedMultiplier != StuckSpeed.NONE;
+    }
+
+    public boolean isCertainlyStuckVertically(VectorData data) {
+        return isCertainlyStuck(data) && data.stuckSpeedMultiplier.getY() < 1 && !player.pointThreeEstimator.controlsVerticalMovement() && player.pointThreeEstimator.canPredictNextVerticalMovement();
+    }
+
     public double getOffsetHorizontal(VectorData data) {
         double threshold = player.getMovementThreshold();
 
@@ -247,6 +257,11 @@ public class UncertaintyHandler {
             pointThree = (0.99 * (threshold * 2)) + threshold;
         }
 
+        // Stuck speed resets velocity every tick, so only the hidden position change is unknown
+        if (explicit003 && isCertainlyStuck(data)) {
+            pointThree = Math.min(pointThree, threshold);
+        }
+
         return pointThree;
     }
 
@@ -260,7 +275,10 @@ public class UncertaintyHandler {
 
     public double getVerticalOffset(VectorData data) {
         // We don't know if the player was pressing jump or not
-        if (player.uncertaintyHandler.wasSteppingOnBouncyBlock && (player.wasTouchingWater || player.wasTouchingLava))
+        // In water and lava the jump key adds 0.04 even in the air. On the tick the player lands on a bouncy block both
+        // movements end on the block, but the bounce carries the difference into the next tick. That tick starts on the
+        // block (isSteppingOnBouncyBlock), however far above it the landing tick started.
+        if (influencedByBouncyBlock() && (player.wasTouchingWater || player.wasTouchingLava))
             return 0.06;
 
         // Not worth my time to fix this because checking flying generally sucks - if player was flying in last 2 ticks
