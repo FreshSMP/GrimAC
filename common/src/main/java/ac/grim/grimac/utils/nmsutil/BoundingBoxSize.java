@@ -20,6 +20,25 @@ import lombok.experimental.UtilityClass;
 @UtilityClass
 public final class BoundingBoxSize {
 
+    // FreshSMP start - players first
+    // In a crowd nearly everything a player tracks is another player, and every one of them is asked for its width
+    // and height on each movement tick. Both chains below reach the player branch only after some sixty others.
+    // Nothing before that branch can match a player: every test is against another type except three for an
+    // inherited type, which are made once here, and one for the guardian class, which is made on each call. So a
+    // player answered first gets the answer the chain gives. Not final so a test can compare the two ways.
+    static boolean playersFirst = !inheritsEarlierBranch(EntityTypes.PLAYER) && !inheritsEarlierBranch(EntityTypes.MANNEQUIN);
+
+    private static boolean inheritsEarlierBranch(EntityType type) {
+        return EntityTypes.isTypeInstanceOf(type, EntityTypes.BOAT)
+                || EntityTypes.isTypeInstanceOf(type, EntityTypes.ABSTRACT_NAUTILUS)
+                || EntityTypes.isTypeInstanceOf(type, EntityTypes.MINECART_ABSTRACT);
+    }
+
+    private static boolean isPlayerFirst(EntityType type, PacketEntity packetEntity) {
+        return playersFirst && (type == EntityTypes.PLAYER || type == EntityTypes.MANNEQUIN) && !(packetEntity instanceof PacketEntityGuardian);
+    }
+    // FreshSMP end - players first
+
     public static float getWidth(GrimPlayer player, PacketEntity packetEntity) {
         float width = getWidthMinusBaby(player, packetEntity);
         return width * (packetEntity.isBaby ? getBabyScaleFactor(player, packetEntity) : 1f);
@@ -27,6 +46,16 @@ public final class BoundingBoxSize {
 
     private static float getWidthMinusBaby(GrimPlayer player, PacketEntity packetEntity) {
         final EntityType type = packetEntity.getType();
+        // FreshSMP start - players first
+        if (isPlayerFirst(type, packetEntity)) {
+            float width = packetEntity.currentPose.width;
+            if (packetEntity.transitionalPose != null) {
+                width = Math.max(width, packetEntity.transitionalPose.width);
+            }
+
+            return width;
+        }
+        // FreshSMP end - players first
         if (type == EntityTypes.CUSHION) {
             return 1.0F;
         } else if (type == EntityTypes.AXOLOTL) {
@@ -276,6 +305,16 @@ public final class BoundingBoxSize {
 
     private static float getHeightMinusBaby(GrimPlayer player, PacketEntity packetEntity) {
         final EntityType type = packetEntity.getType();
+        // FreshSMP start - players first
+        if (isPlayerFirst(type, packetEntity)) {
+            float height = packetEntity.currentPose.height;
+            if (packetEntity.transitionalPose != null) {
+                height = Math.max(height, packetEntity.transitionalPose.height);
+            }
+
+            return height;
+        }
+        // FreshSMP end - players first
         if (type == EntityTypes.CUSHION) {
             return 0.25F;
         } else if (type == EntityTypes.ARMADILLO) {
