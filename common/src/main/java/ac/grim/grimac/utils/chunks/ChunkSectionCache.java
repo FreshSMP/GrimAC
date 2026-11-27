@@ -289,6 +289,17 @@ public final class ChunkSectionCache {
     }
 
     private static BaseChunk emptySectionLike(BaseChunk source) {
+        BaseChunk empty = newSectionLike(source);
+
+        // A new section's palette holds nothing, so every block in it reads as whatever is written first.
+        // Write air first, as CompensatedWorld does for a section it creates: without it the first block
+        // placed into a copy of an all-air section became the whole section, and a copy counted its blocks
+        // from the wrong start.
+        empty.set(0, 0, 0, 0);
+        return empty;
+    }
+
+    private static BaseChunk newSectionLike(BaseChunk source) {
         if (source instanceof Chunk_v1_18) return new Chunk_v1_18();
         if (source instanceof Chunk_v1_9) return new Chunk_v1_9(0, PaletteType.CHUNK.create());
         if (source instanceof Chunk_v1_8) return new Chunk_v1_8(true);
